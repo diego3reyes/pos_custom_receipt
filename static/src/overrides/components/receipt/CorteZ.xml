@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+
+    <t t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension">
+        <xpath expr="//div[button[@title='Download a report with all the sales of the current PoS Session']]" position="after">
+            <button class="button btn btn-secondary"
+                    t-att-class="this.ui.isSmall ? 'w-100' : 'btn-lg'"
+                    t-if="pos.config.show_corte_z"
+                    t-on-click="printCorteZ"
+                    title="Imprimir reporte de cierre de caja (Corte Z)">
+                Corte Z
+                <i t-if="!this.ui.isSmall" class="fa fa-print ms-1" role="img"/>
+            </button>
+        </xpath>
+    </t>
+
+    <t t-name="pos_custom_receipt.CorteZDialog">
+        <Dialog contentClass="'corte-z-dialog-content'">
+            <t t-set-slot="header">
+                <h5 class="mb-0">Vista previa — Corte Z</h5>
+            </t>
+
+            <div class="corte-z-receipt">
+                <div class="center bold" t-esc="props.data.company_name"/>
+                <div t-if="props.data.company_address" class="center" t-esc="props.data.company_address"/>
+                <div t-if="props.data.company_phone" class="center"><span>Tel: </span><t t-esc="props.data.company_phone"/></div>
+                <hr/>
+                <div class="center big">*** CORTE Z ***</div>
+                <hr/>
+                <div class="row"><span>Apertura:</span><span t-esc="props.data.open_time"/></div>
+                <div class="row"><span>Cierre:</span><span t-esc="props.data.close_time"/></div>
+                <div class="row"><span>Cajero:</span><span t-esc="props.data.cashier"/></div>
+                <hr/>
+                <div class="row bold">
+                    <span>Tickets procesados:</span>
+                    <span t-esc="props.data.orders_count"/>
+                </div>
+                <hr/>
+                <div class="bold center">VENTAS</div>
+                <div class="row"><span>Subtotal:</span><span t-esc="props.data.subtotal"/></div>
+                <div class="row"><span>IVA:</span><span t-esc="props.data.tax_total"/></div>
+                <div class="row bold big"><span>TOTAL:</span><span t-esc="props.data.total"/></div>
+                <hr/>
+                <div class="bold center">FORMA DE PAGO</div>
+                <t t-foreach="props.data.payments" t-as="pm" t-key="pm.name">
+                    <div class="row"><span t-esc="pm.name"/>:<span t-esc="pm.amount"/></div>
+                </t>
+                <t t-if="props.data.cash_moves.length">
+                    <hr/>
+                    <div class="bold center">MOVIMIENTOS DE CAJA</div>
+                    <t t-foreach="props.data.cash_moves" t-as="mv" t-key="mv_index">
+                        <div class="row"><span t-esc="mv.name"/>:<span t-esc="mv.amount"/></div>
+                    </t>
+                </t>
+                <hr/>
+                <div class="center">*** FIN DEL REPORTE ***</div>
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-on-click="printReceipt">
+                    <i class="fa fa-print me-1"/>Imprimir
+                </button>
+                <button class="btn btn-secondary ms-2" t-on-click="() => props.close()">
+                    Cerrar
+                </button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

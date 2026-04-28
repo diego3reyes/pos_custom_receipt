@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
+
+        <!-- Inserta ticket personalizado antes del original -->
+        <xpath expr="//div[hasclass('pos-receipt')]" position="before">
+            <t t-if="useCustomTemplate">
+                <div class="pos-receipt pos-custom-receipt" t-out="renderedTemplate"/>
+            </t>
+        </xpath>
+
+    </t>
+
+    <!-- Correlativo personalizado en ReceiptHeader -->
+    <t t-inherit="point_of_sale.ReceiptHeader" t-inherit-mode="extension">
+        <xpath expr="//t[@t-out='order.pos_reference']" position="replace">
+            <t t-out="customTicketNumber || order.pos_reference"/>
+        </xpath>
+    </t>
+
+</templates>

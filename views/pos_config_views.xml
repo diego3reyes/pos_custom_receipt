@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="pos_config_view_form_custom_receipt" model="ir.ui.view">
+        <field name="name">pos.config.view.form.custom.receipt</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Nueva pestaña en el notebook de configuración del POS -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Ticket Personalizable" name="custom_receipt_page">
+
+                    <!-- COMPORTAMIENTO -->
+                    <group string="Comportamiento del POS" name="pos_behavior_config">
+                        <field name="show_corte_z"/>
+                        <field name="default_partner_id"
+                               placeholder="Buscar contacto..."
+                               options="{'no_create': True}"/>
+                    </group>
+
+                    <!-- CORRELATIVO -->
+                    <group string="Correlativo del Ticket" name="ticket_sequence_config">
+                        <group>
+                            <field name="ticket_prefix" placeholder="Ej: FAC- o TD-"/>
+                            <field name="ticket_suffix" placeholder="Opcional"/>
+                            <field name="ticket_next_number"/>
+                            <field name="ticket_padding"/>
+                        </group>
+                        <group>
+                            <field name="ticket_reset_sequence"/>
+                            <div class="text-muted" colspan="2">
+                                Formato resultante:
+                                <strong>[prefijo][000001][sufijo]</strong>
+                            </div>
+                        </group>
+                    </group>
+
+                    <!-- APARIENCIA -->
+                    <group string="Apariencia del Ticket" name="ticket_appearance_config">
+                        <group>
+                            <field name="ticket_footer_message"
+                                   placeholder="Gracias por su compra"/>
+                            <field name="show_cashier_on_ticket"/>
+                            <field name="show_customer_on_ticket"/>
+                        </group>
+                        <group>
+                            <field name="hide_odoo_branding"/>
+                            <field name="hide_tax_on_lines"/>
+                        </group>
+                    </group>
+
+                    <!-- PLANTILLA PERSONALIZADA -->
+                    <group string="Plantilla HTML del Ticket" name="ticket_template_config">
+                        <field name="use_custom_template"/>
+                        <field name="receipt_template"
+                               widget="ace"
+                               options="{'mode': 'html'}"
+                               invisible="not use_custom_template"
+                               placeholder="Escribe aquí tu plantilla HTML personalizada..."/>
+                        <div invisible="not use_custom_template" colspan="2">
+                            <p class="text-muted">
+                                Variables: <code>{{ company.name }}</code>,
+                                <code>{{ company.street }}</code>,
+                                <code>{{ company.phone }}</code>,
+                                <code>{{ company.logo }}</code>,
+                                <code>{{ ticket.number }}</code>,
+                                <code>{{ ticket.date }}</code>,
+                                <code>{{ ticket.time }}</code>,
+                                <code>{{ ticket.cashier }}</code>,
+                                <code>{{ customer.name }}</code>,
+                                <code>{{ totals.subtotal }}</code>,
+                                <code>{{ totals.tax_amount }}</code>,
+                                <code>{{ totals.total }}</code>,
+                                <code>{{ totals.change }}</code>,
+                                <code>{{ config.footer_message }}</code>.
+                                Líneas: <code>{% for line in lines %}...{% endfor %}</code>.
+                                Pagos: <code>{% for payment in payments %}...{% endfor %}</code>.
+                            </p>
+                        </div>
+                    </group>
+
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>
