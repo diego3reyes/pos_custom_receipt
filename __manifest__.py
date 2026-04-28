@@ -20,6 +20,7 @@
     ],
     'data': [
         'security/ir.model.access.csv',
+        'data/pos_custom_receipt_data.xml',
         'views/pos_config_views.xml',
     ],
     'assets': {

@@ -99,6 +99,11 @@ class PosConfig(models.Model):
             self.receipt_template = self._get_default_receipt_template()
 
     def _get_default_receipt_template(self):
+        param = self.env['ir.config_parameter'].sudo().get_param(
+            'pos_custom_receipt.default_template'
+        )
+        if param:
+            return param
         return """\
 <div class="pos-receipt">
 
@@ -181,6 +186,46 @@ class PosConfig(models.Model):
   {% endif %}
 
 </div>"""
+
+    @api.model
+    def _cron_reset_ticket_sequences(self):
+        """Cron diario: reinicia correlativos de tickets según configuración anual/mensual."""
+        today = fields.Date.today()
+        configs = self.search([('ticket_reset_sequence', '!=', 'never')])
+        for config in configs:
+            if not self._needs_sequence_reset(config, today):
+                continue
+            last_order = self.env['pos.order'].search(
+                [('config_id', '=', config.id)],
+                order='id desc', limit=1,
+            )
+            new_base = 0
+            if last_order and last_order.pos_reference:
+                parts = last_order.pos_reference.split('-')
+                try:
+                    new_base = int(parts[-1])
+                except (ValueError, IndexError):
+                    new_base = 0
+            config.write({
+                'ticket_sequence_base': new_base,
+                'ticket_sequence_last_reset': today,
+            })
+
+    def _needs_sequence_reset(self, config, today):
+        reset_mode = config.ticket_reset_sequence
+        if not reset_mode or reset_mode == 'never':
+            return False
+        last_reset = config.ticket_sequence_last_reset
+        if not last_reset:
+            return True
+        if reset_mode == 'yearly':
+            return last_reset.year < today.year
+        if reset_mode == 'monthly':
+            return (
+                last_reset.year < today.year or
+                (last_reset.year == today.year and last_reset.month < today.month)
+            )
+        return False
 
     @api.constrains('ticket_padding')
     def _check_ticket_padding(self):
