@@ -1,11 +1,12 @@
 {
     'name': 'POS — Ticket Personalizable y Correlativos',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'category': 'Point of Sale',
     'summary': 'Editor de ticket HTML y correlativos configurables para el POS',
     'description': '''
         Personaliza completamente el ticket del Punto de Venta en Odoo 19:
         - Editor de plantilla HTML del ticket desde la interfaz
+        - Corte Z con plantilla HTML editable, reimprimible desde la sesión ya cerrada
         - Correlativo con prefijo, sufijo, padding y número inicial configurables
         - Ocultar branding de Odoo
         - Ocultar etiquetas de IVA por línea
@@ -22,6 +23,7 @@
         'security/ir.model.access.csv',
         'data/pos_custom_receipt_data.xml',
         'views/pos_config_views.xml',
+        'views/pos_session_views.xml',
     ],
     'assets': {
         'point_of_sale._assets_pos': [

@@ -25,6 +25,8 @@ Módulo para **Odoo 19.0** (Community y Enterprise) que permite personalizar com
 - Reporte de cierre de caja en formato 80 mm
 - Incluye ventas, pagos por método y movimientos de caja (entradas/salidas)
 - Botón de impresión desde el popup de cierre de sesión
+- **Reimpresión de sesiones ya cerradas**: botón *Imprimir Corte Z* en **Punto de Venta → Sesiones → [sesión]**
+- **Plantilla HTML editable** con la misma sintaxis que el ticket, compartida entre el POS y el backend
 - Activable/desactivable desde la configuración
 
 ## Instalación
@@ -58,6 +60,31 @@ Módulo para **Odoo 19.0** (Community y Enterprise) que permite personalizar com
 {{ totals.change }}         Cambio
 {{ config.footer_message }} Pie de página
 ```
+
+## Variables disponibles en la plantilla del Corte Z
+
+```
+{{ company.name }}          Nombre de la empresa
+{{ company.vat }}           NIT/RFC
+{{ company.street }}        Dirección
+{{ company.phone }}         Teléfono
+{{ company.logo }}          Logo (data URI, para usar en <img src="...">)
+{{ session.name }}          Nombre de la sesión (ej: POS/00042)
+{{ session.config_name }}   Nombre de la caja / punto de venta
+{{ session.cashier }}       Responsable de la sesión
+{{ session.open_time }}     Fecha y hora de apertura
+{{ session.close_time }}    Fecha y hora de cierre
+{{ totals.orders_count }}   Tickets procesados
+{{ totals.subtotal }}       Subtotal
+{{ totals.tax_total }}      Impuesto
+{{ totals.total }}          Total
+
+{% for payment in payments %}{{ payment.name }} {{ payment.amount }}{% endfor %}
+{% if cash_moves %}{% for move in cash_moves %}{{ move.name }} {{ move.amount }}{% endfor %}{% endif %}
+```
+
+Clases CSS disponibles: `row` (etiqueta a la izquierda, valor a la derecha),
+`center`, `bold`, `big`.
 
 ## Licencia
 

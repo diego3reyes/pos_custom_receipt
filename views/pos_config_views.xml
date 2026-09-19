@@ -79,6 +79,42 @@
                         </div>
                     </group>
 
+                    <!-- PLANTILLA DEL CORTE Z -->
+                    <group string="Plantilla HTML del Corte Z" name="corte_z_template_config">
+                        <field name="corte_z_template"
+                               widget="ace"
+                               options="{'mode': 'html'}"
+                               nolabel="1"
+                               colspan="2"/>
+                        <div colspan="2">
+                            <button name="action_reset_corte_z_template"
+                                    type="object"
+                                    string="Restaurar plantilla por defecto"
+                                    class="btn-link ps-0"
+                                    icon="fa-undo"/>
+                            <p class="text-muted">
+                                Variables: <code>{{ company.name }}</code>,
+                                <code>{{ company.vat }}</code>,
+                                <code>{{ company.street }}</code>,
+                                <code>{{ company.phone }}</code>,
+                                <code>{{ company.logo }}</code>,
+                                <code>{{ session.name }}</code>,
+                                <code>{{ session.config_name }}</code>,
+                                <code>{{ session.cashier }}</code>,
+                                <code>{{ session.open_time }}</code>,
+                                <code>{{ session.close_time }}</code>,
+                                <code>{{ totals.orders_count }}</code>,
+                                <code>{{ totals.subtotal }}</code>,
+                                <code>{{ totals.tax_total }}</code>,
+                                <code>{{ totals.total }}</code>.
+                                Pagos: <code>{% for payment in payments %}{{ payment.name }} {{ payment.amount }}{% endfor %}</code>.
+                                Movimientos de caja: <code>{% for move in cash_moves %}{{ move.name }} {{ move.amount }}{% endfor %}</code>.
+                                Clases disponibles: <code>row</code>, <code>center</code>,
+                                <code>bold</code>, <code>big</code>.
+                            </p>
+                        </div>
+                    </group>
+
                 </page>
             </xpath>
 

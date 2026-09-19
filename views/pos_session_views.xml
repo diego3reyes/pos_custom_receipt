@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_pos_session_form_corte_z" model="ir.ui.view">
+        <field name="name">pos.session.form.corte.z</field>
+        <field name="model">pos.session</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_session_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//header" position="inside">
+                <button name="action_print_corte_z"
+                        type="object"
+                        string="Imprimir Corte Z"
+                        icon="fa-print"
+                        class="btn-secondary"
+                        invisible="state not in ('closing_control', 'closed')"/>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

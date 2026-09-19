@@ -1,6 +1,54 @@
 from odoo import fields, models, api
 from odoo.exceptions import ValidationError
 
+DEFAULT_CORTE_Z_TEMPLATE = """\
+<div class="corte-z">
+
+  <div class="center bold">{{ company.name }}</div>
+  {% if company.vat %}<div class="center">NIT: {{ company.vat }}</div>{% endif %}
+  {% if company.street %}<div class="center">{{ company.street }}</div>{% endif %}
+  {% if company.phone %}<div class="center">Tel: {{ company.phone }}</div>{% endif %}
+
+  <hr/>
+  <div class="center big">*** CORTE Z ***</div>
+  <hr/>
+
+  <div class="row"><span>Sesión:</span><span>{{ session.name }}</span></div>
+  <div class="row"><span>Caja:</span><span>{{ session.config_name }}</span></div>
+  <div class="row"><span>Apertura:</span><span>{{ session.open_time }}</span></div>
+  <div class="row"><span>Cierre:</span><span>{{ session.close_time }}</span></div>
+  <div class="row"><span>Cajero:</span><span>{{ session.cashier }}</span></div>
+
+  <hr/>
+  <div class="row bold">
+    <span>Tickets procesados:</span><span>{{ totals.orders_count }}</span>
+  </div>
+
+  <hr/>
+  <div class="bold center">VENTAS</div>
+  <div class="row"><span>Subtotal:</span><span>{{ totals.subtotal }}</span></div>
+  <div class="row"><span>IVA:</span><span>{{ totals.tax_total }}</span></div>
+  <div class="row bold big"><span>TOTAL:</span><span>{{ totals.total }}</span></div>
+
+  <hr/>
+  <div class="bold center">FORMA DE PAGO</div>
+  {% for payment in payments %}
+  <div class="row"><span>{{ payment.name }}:</span><span>{{ payment.amount }}</span></div>
+  {% endfor %}
+
+  {% if cash_moves %}
+  <hr/>
+  <div class="bold center">MOVIMIENTOS DE CAJA</div>
+  {% for move in cash_moves %}
+  <div class="row"><span>{{ move.name }}:</span><span>{{ move.amount }}</span></div>
+  {% endfor %}
+  {% endif %}
+
+  <hr/>
+  <div class="center">*** FIN DEL REPORTE ***</div>
+
+</div>"""
+
 
 class PosConfig(models.Model):
     _inherit = 'pos.config'
@@ -83,6 +131,19 @@ class PosConfig(models.Model):
         string='Plantilla HTML del ticket',
         help='Edita el HTML del ticket. Usa {{ variable }} para datos dinámicos.',
     )
+    corte_z_template = fields.Text(
+        string='Plantilla HTML del Corte Z',
+        default=lambda self: DEFAULT_CORTE_Z_TEMPLATE,
+        help='Edita el HTML del Corte Z. Si se deja vacío se usa la plantilla por defecto.',
+    )
+
+    def action_reset_corte_z_template(self):
+        for rec in self:
+            rec.corte_z_template = DEFAULT_CORTE_Z_TEMPLATE
+        return True
+
+    def _get_default_corte_z_template(self):
+        return DEFAULT_CORTE_Z_TEMPLATE
 
     def apply_sequence_reset(self, new_base):
         """Called from POS frontend when a period reset is triggered."""
