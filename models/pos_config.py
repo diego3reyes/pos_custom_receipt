@@ -44,6 +44,24 @@ DEFAULT_CORTE_Z_TEMPLATE = """\
   {% endfor %}
   {% endif %}
 
+  {% if dte_summary.fc.documents %}
+  <hr/>
+  <div class="bold center">FACTURAS</div>
+  <div class="row"><span>DTE Inicial:</span><span>{{ dte_summary.fc.initial }}</span></div>
+  <div class="row"><span>DTE Final:</span><span>{{ dte_summary.fc.final }}</span></div>
+  <div class="row"><span>Cantidad:</span><span>{{ dte_summary.fc.count }}</span></div>
+  <div class="row bold"><span>Total:</span><span>{{ dte_summary.fc.total }}</span></div>
+  {% endif %}
+
+  {% if dte_summary.ccf.documents %}
+  <hr/>
+  <div class="bold center">CREDITOS FISCALES</div>
+  <div class="row"><span>DTE Inicial:</span><span>{{ dte_summary.ccf.initial }}</span></div>
+  <div class="row"><span>DTE Final:</span><span>{{ dte_summary.ccf.final }}</span></div>
+  <div class="row"><span>Cantidad:</span><span>{{ dte_summary.ccf.count }}</span></div>
+  <div class="row bold"><span>Total:</span><span>{{ dte_summary.ccf.total }}</span></div>
+  {% endif %}
+
   <hr/>
   <div class="center">*** FIN DEL REPORTE ***</div>
 

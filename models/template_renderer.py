@@ -1,8 +1,13 @@
-"""Motor de plantillas mínimo, equivalente a static/src/js/template_renderer.js.
+"""Motor de plantillas mínimo, hermano de static/src/js/template_renderer.js.
 
-Soporta {{ variable.ruta }}, {% if [not] variable %} y {% for x in lista %}.
+Soporta {{ variable.ruta }}, {% if [not] variable.ruta %} y
+{% for x in lista.con.ruta %}.
 Se usa en el servidor para que el Corte Z salga idéntico desde el POS y desde
 el backend (una sola plantilla, un solo renderizador).
+
+Diferencia con el motor JS: aquí {% for %} acepta rutas con punto
+(p. ej. dte_summary.fc.documents). El motor JS solo acepta un nombre simple;
+no se toca para no alterar el ticket de venta, que es lo único que lo usa.
 """
 
 import re
@@ -12,7 +17,7 @@ from markupsafe import escape
 # ponytail: regex no-greedy → sin if anidados dentro de if. La plantilla por
 # defecto no los usa; si algún día hacen falta, toca un parser de verdad.
 _VAR_RE = re.compile(r'\{\{\s*([\w.]+)\s*\}\}')
-_FOR_RE = re.compile(r'\{%\s*for\s+(\w+)\s+in\s+(\w+)\s*%\}([\s\S]*?)\{%\s*endfor\s*%\}')
+_FOR_RE = re.compile(r'\{%\s*for\s+(\w+)\s+in\s+([\w.]+)\s*%\}([\s\S]*?)\{%\s*endfor\s*%\}')
 _IF_RE = re.compile(r'\{%\s*if\s+(not\s+)?([\w.]+)\s*%\}([\s\S]*?)\{%\s*endif\s*%\}')
 
 
@@ -45,7 +50,7 @@ def _render_vars(template, context):
 def _render_for(template, context):
     def replace(match):
         item_var, list_var, body = match.groups()
-        items = context.get(list_var)
+        items = _lookup(context, list_var)
         if not isinstance(items, (list, tuple)):
             return ''
         return ''.join(render(body, dict(context, **{item_var: item})) for item in items)
@@ -76,6 +81,15 @@ if __name__ == '__main__':
     assert render('{% for i in items %}{{ i.n }}={{ i.v }};{% endfor %}', ctx) == 'Efectivo=10;Tarjeta=5;'
     assert render('{% for i in empty %}x{% endfor %}', ctx) == ''
     assert render('{% for i in nope %}x{% endfor %}', ctx) == ''
+    # rutas con punto en {% for %} y {% if %} (dte_summary.fc.documents)
+    nested = {'s': {'fc': {'documents': [{'n': 'DTE-01-A'}, {'n': 'DTE-01-B'}], 'count': 2},
+                    'ccf': {'documents': [], 'count': 0}}}
+    assert render('{% for d in s.fc.documents %}{{ d.n }};{% endfor %}', nested) == 'DTE-01-A;DTE-01-B;'
+    assert render('{% for d in s.ccf.documents %}{{ d.n }};{% endfor %}', nested) == ''
+    assert render('{% for d in s.nope.documents %}x{% endfor %}', nested) == ''
+    assert render('{% if s.fc.documents %}sí{% endif %}', nested) == 'sí'
+    assert render('{% if s.ccf.documents %}no{% endif %}', nested) == ''
+    assert render('{{ s.ccf.count }}', nested) == '0'
     # for dentro de if: el for se procesa primero, igual que en el motor JS
     assert render('{% if items %}{% for i in items %}{{ i.n }},{% endfor %}{% endif %}', ctx) == 'Efectivo,Tarjeta,'
     print('template_renderer OK')

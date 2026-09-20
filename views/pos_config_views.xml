@@ -112,6 +112,35 @@
                                 Clases disponibles: <code>row</code>, <code>center</code>,
                                 <code>bold</code>, <code>big</code>.
                             </p>
+                            <p class="text-muted">
+                                <strong>Resumen de DTE</strong> (solo si el módulo de
+                                facturación electrónica está instalado; si no, las
+                                secciones salen vacías y el Corte Z funciona igual).
+                                Facturas (<code>DTE-01-</code>):
+                                <code>{{ dte_summary.fc.count }}</code>,
+                                <code>{{ dte_summary.fc.initial }}</code>,
+                                <code>{{ dte_summary.fc.final }}</code>,
+                                <code>{{ dte_summary.fc.total }}</code>.
+                                Créditos fiscales (<code>DTE-03-</code>):
+                                <code>{{ dte_summary.ccf.count }}</code>,
+                                <code>{{ dte_summary.ccf.initial }}</code>,
+                                <code>{{ dte_summary.ccf.final }}</code>,
+                                <code>{{ dte_summary.ccf.total }}</code>.
+                            </p>
+                            <p class="text-muted">
+                                Para imprimir <strong>todos</strong> los números de control,
+                                recorre la lista completa
+                                (<code>dte_summary.fc.documents</code> o
+                                <code>dte_summary.ccf.documents</code>); cada documento tiene
+                                <code>number</code>, <code>order</code> y <code>amount</code>:
+                            </p>
+                            <pre class="text-muted small">{% if dte_summary.fc.documents %}
+&lt;div class="bold"&gt;DTE EMITIDOS:&lt;/div&gt;
+{% for doc in dte_summary.fc.documents %}
+&lt;div class="row"&gt;&lt;span&gt;{{ doc.order }}&lt;/span&gt;&lt;span&gt;{{ doc.amount }}&lt;/span&gt;&lt;/div&gt;
+&lt;div&gt;{{ doc.number }}&lt;/div&gt;
+{% endfor %}
+{% endif %}</pre>
                         </div>
                     </group>
 
