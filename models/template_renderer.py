@@ -1,32 +1,35 @@
 """Motor de plantillas mínimo, hermano de static/src/js/template_renderer.js.
 
 Soporta {{ variable.ruta }}, {% if [not] variable.ruta %} y
-{% for x in lista.con.ruta %}.
+{% for x in lista.con.ruta %}, todos con rutas anidadas y bloques que se
+pueden anidar entre sí en cualquier combinación.
 Se usa en el servidor para que el Corte Z salga idéntico desde el POS y desde
 el backend (una sola plantilla, un solo renderizador).
 
-Diferencia con el motor JS: aquí {% for %} acepta rutas con punto
-(p. ej. dte_summary.fc.documents). El motor JS solo acepta un nombre simple;
-no se toca para no alterar el ticket de venta, que es lo único que lo usa.
+Los bloques se parsean con una pila, no con regex de emparejamiento: un regex
+no-greedy casa el {% if %} externo con el {% endif %} interno y deja tags
+sueltos impresos en el ticket.
+
+Diferencia con el motor JS: aquí {% for %} y {% if %} aceptan rutas con punto
+(p. ej. dte_summary.fc.documents) y anidamiento. El motor JS solo acepta un
+nombre simple; no se toca para no alterar el ticket de venta, que es lo único
+que lo usa.
 """
 
 import re
 
 from markupsafe import escape
 
-# ponytail: regex no-greedy → sin if anidados dentro de if. La plantilla por
-# defecto no los usa; si algún día hacen falta, toca un parser de verdad.
 _VAR_RE = re.compile(r'\{\{\s*([\w.]+)\s*\}\}')
-_FOR_RE = re.compile(r'\{%\s*for\s+(\w+)\s+in\s+([\w.]+)\s*%\}([\s\S]*?)\{%\s*endfor\s*%\}')
-_IF_RE = re.compile(r'\{%\s*if\s+(not\s+)?([\w.]+)\s*%\}([\s\S]*?)\{%\s*endif\s*%\}')
+_TAG_RE = re.compile(r'\{%\s*(?P<tag>if|for|endif|endfor)\b(?P<args>[^%]*?)\s*%\}')
+_IF_ARGS_RE = re.compile(r'^(not\s+)?([\w.]+)$')
+_FOR_ARGS_RE = re.compile(r'^(\w+)\s+in\s+([\w.]+)$')
 
 
 def render(template, context):
     if not template:
         return ''
-    result = _render_for(template, context)
-    result = _render_if(result, context)
-    return _render_vars(result, context)
+    return _render_nodes(_parse(template), context)
 
 
 def _lookup(context, path):
@@ -38,31 +41,76 @@ def _lookup(context, path):
     return value
 
 
-def _render_vars(template, context):
+def _render_vars(text, context):
     def replace(match):
         value = _lookup(context, match.group(1))
         # Los valores vienen de la BD (nombres de métodos de pago, empresa...),
         # así que se escapan: la plantilla es HTML, los datos no.
         return '' if value is None else str(escape(str(value)))
-    return _VAR_RE.sub(replace, template)
+    return _VAR_RE.sub(replace, text)
 
 
-def _render_for(template, context):
-    def replace(match):
-        item_var, list_var, body = match.groups()
-        items = _lookup(context, list_var)
-        if not isinstance(items, (list, tuple)):
-            return ''
-        return ''.join(render(body, dict(context, **{item_var: item})) for item in items)
-    return _FOR_RE.sub(replace, template)
+def _parse(template):
+    """Convierte la plantilla en un árbol de nodos respetando el anidamiento.
+
+    Nodos: ('text', str) | ('if', negado, ruta, hijos) | ('for', var, ruta, hijos).
+    Los tags mal formados o descolgados se descartan; nunca se imprimen.
+    """
+    root = []
+    stack = [(None, root)]
+    position = 0
+
+    for match in _TAG_RE.finditer(template):
+        if match.start() > position:
+            stack[-1][1].append(('text', template[position:match.start()]))
+        position = match.end()
+        tag, args = match.group('tag'), match.group('args').strip()
+
+        if tag == 'if':
+            parsed = _IF_ARGS_RE.match(args)
+            stack.append((
+                ('if', bool(parsed and parsed.group(1)), parsed.group(2) if parsed else None),
+                [],
+            ))
+        elif tag == 'for':
+            parsed = _FOR_ARGS_RE.match(args)
+            stack.append((
+                ('for', parsed.group(1) if parsed else None, parsed.group(2) if parsed else None),
+                [],
+            ))
+        elif len(stack) > 1:
+            _close(stack)
+        # endif/endfor sin bloque abierto: se descarta, no se imprime.
+
+    if position < len(template):
+        stack[-1][1].append(('text', template[position:]))
+    while len(stack) > 1:  # bloques sin cerrar: se cierran al final
+        _close(stack)
+    return root
 
 
-def _render_if(template, context):
-    def replace(match):
-        negated, path, body = match.groups()
-        truthy = bool(_lookup(context, path))
-        return render(body, context) if (not truthy if negated else truthy) else ''
-    return _IF_RE.sub(replace, template)
+def _close(stack):
+    meta, children = stack.pop()
+    stack[-1][1].append(meta + (children,))
+
+
+def _render_nodes(nodes, context):
+    out = []
+    for node in nodes:
+        if node[0] == 'text':
+            out.append(_render_vars(node[1], context))
+        elif node[0] == 'if':
+            _tag, negated, path, children = node
+            truthy = bool(_lookup(context, path)) if path else False
+            if truthy != negated:
+                out.append(_render_nodes(children, context))
+        else:
+            _tag, item_var, path, children = node
+            items = _lookup(context, path) if path else None
+            if item_var and isinstance(items, (list, tuple)):
+                for item in items:
+                    out.append(_render_nodes(children, dict(context, **{item_var: item})))
+    return ''.join(out)
 
 
 if __name__ == '__main__':
@@ -77,19 +125,71 @@ if __name__ == '__main__':
     assert render('{% if company.name %}sí{% endif %}', ctx) == 'sí'
     assert render('{% if company.phone %}no{% endif %}', ctx) == ''
     assert render('{% if not company.phone %}sí{% endif %}', ctx) == 'sí'
+    assert render('{% if not company.name %}no{% endif %}', ctx) == ''
     assert render('{% if empty %}no{% endif %}', ctx) == ''
     assert render('{% for i in items %}{{ i.n }}={{ i.v }};{% endfor %}', ctx) == 'Efectivo=10;Tarjeta=5;'
     assert render('{% for i in empty %}x{% endfor %}', ctx) == ''
     assert render('{% for i in nope %}x{% endfor %}', ctx) == ''
-    # rutas con punto en {% for %} y {% if %} (dte_summary.fc.documents)
-    nested = {'s': {'fc': {'documents': [{'n': 'DTE-01-A'}, {'n': 'DTE-01-B'}], 'count': 2},
-                    'ccf': {'documents': [], 'count': 0}}}
-    assert render('{% for d in s.fc.documents %}{{ d.n }};{% endfor %}', nested) == 'DTE-01-A;DTE-01-B;'
-    assert render('{% for d in s.ccf.documents %}{{ d.n }};{% endfor %}', nested) == ''
-    assert render('{% for d in s.nope.documents %}x{% endfor %}', nested) == ''
-    assert render('{% if s.fc.documents %}sí{% endif %}', nested) == 'sí'
-    assert render('{% if s.ccf.documents %}no{% endif %}', nested) == ''
-    assert render('{{ s.ccf.count }}', nested) == '0'
-    # for dentro de if: el for se procesa primero, igual que en el motor JS
     assert render('{% if items %}{% for i in items %}{{ i.n }},{% endfor %}{% endif %}', ctx) == 'Efectivo,Tarjeta,'
+
+    # ── Corte Z: rutas con punto en {% if %} y {% for %} ──────────────────
+    z = {
+        'cash_moves': [{'name': 'Retiro', 'amount': '-$50.00'}],
+        'payments': [],
+        'dte_summary': {
+            'fc': {'count': 2, 'initial': 'DTE-01-A', 'final': 'DTE-01-B', 'total': '$17.90',
+                   'documents': [{'number': 'DTE-01-A'}, {'number': 'DTE-01-B'}]},
+            'ccf': {'count': 0, 'initial': '', 'final': '', 'total': '$0.00', 'documents': []},
+        },
+    }
+    # variables simples, caso verdadero y falso
+    assert render('{% if cash_moves %}MOV{% endif %}', z) == 'MOV'
+    assert render('{% if payments %}PAGO{% endif %}', z) == ''
+    assert render('{% if not payments %}SIN PAGOS{% endif %}', z) == 'SIN PAGOS'
+    # rutas con punto, caso verdadero y falso
+    assert render('{% if dte_summary.fc.count %}FC{% endif %}', z) == 'FC'
+    assert render('{% if dte_summary.ccf.count %}CCF{% endif %}', z) == ''
+    assert render('{% if dte_summary.fc.documents %}FCD{% endif %}', z) == 'FCD'
+    assert render('{% if dte_summary.ccf.documents %}CCFD{% endif %}', z) == ''
+    assert render('{% if dte_summary.nope.count %}X{% endif %}', z) == ''
+    assert render('{{ dte_summary.ccf.count }}|{{ dte_summary.fc.total }}', z) == '0|$17.90'
+    # if + for juntos
+    assert render(
+        '{% if dte_summary.fc.documents %}{% for doc in dte_summary.fc.documents %}'
+        '[{{ doc.number }}]{% endfor %}{% endif %}', z
+    ) == '[DTE-01-A][DTE-01-B]'
+    assert render(
+        '{% if dte_summary.ccf.documents %}{% for doc in dte_summary.ccf.documents %}'
+        '[{{ doc.number }}]{% endfor %}{% endif %}', z
+    ) == ''
+    # if anidado dentro de if (el bug que imprimía los tags literalmente)
+    assert render('{% if dte_summary.fc.documents %}X{% if dte_summary.fc.count %}Y'
+                  '{% endif %}Z{% endif %}', z) == 'XYZ'
+    assert render('{% if dte_summary.fc.documents %}X{% if dte_summary.ccf.count %}Y'
+                  '{% endif %}Z{% endif %}', z) == 'XZ'
+    assert render('{% if dte_summary.ccf.count %}X{% if dte_summary.fc.count %}Y'
+                  '{% endif %}Z{% endif %}', z) == ''
+    # if dentro de for, y for dentro de for
+    assert render('{% for doc in dte_summary.fc.documents %}{% if doc.number %}'
+                  '<{{ doc.number }}>{% endif %}{% endfor %}', z) == '<DTE-01-A><DTE-01-B>'
+    assert render('{% for a in items %}{% for b in items %}{{ a.n }}/{{ b.n }};'
+                  '{% endfor %}{% endfor %}', ctx) == (
+        'Efectivo/Efectivo;Efectivo/Tarjeta;Tarjeta/Efectivo;Tarjeta/Tarjeta;')
+    # tres niveles
+    assert render('{% if dte_summary.fc.documents %}a{% if dte_summary.fc.count %}b'
+                  '{% for d in dte_summary.fc.documents %}{{ d.number }}{% endfor %}'
+                  'c{% endif %}d{% endif %}', z) == 'abDTE-01-ADTE-01-Bcd'
+
+    # ── ningún tag se imprime literalmente, ni con plantillas rotas ───────
+    rotas = [
+        '{% if dte_summary.fc.count %}sin cierre',
+        'huérfano {% endif %} suelto',
+        '{% endfor %}{% if payments %}x{% endif %}',
+        '{% if dte_summary.fc.count %}{% for d in dte_summary.fc.documents %}x{% endif %}',
+        '{% if a and b %}raro{% endif %}',
+        '{% for %}incompleto{% endfor %}',
+    ]
+    for rota in rotas:
+        assert '{%' not in render(rota, z), rota
+
     print('template_renderer OK')
