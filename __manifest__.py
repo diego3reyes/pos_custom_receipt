@@ -1,6 +1,6 @@
 {
     'name': 'POS — Ticket Personalizable y Correlativos',
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.3.0',
     'category': 'Point of Sale',
     'summary': 'Editor de ticket HTML y correlativos configurables para el POS',
     'description': '''
@@ -28,6 +28,7 @@
     'assets': {
         'point_of_sale._assets_pos': [
             'pos_custom_receipt/static/src/js/template_renderer.js',
+            'pos_custom_receipt/static/src/js/receipt_extra.js',
             'pos_custom_receipt/static/src/js/ticket_sequence.js',
             'pos_custom_receipt/static/src/js/default_partner.js',
             'pos_custom_receipt/static/src/js/corte_z.js',

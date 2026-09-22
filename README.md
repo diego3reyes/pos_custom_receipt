@@ -53,13 +53,31 @@ Módulo para **Odoo 19.0** (Community y Enterprise) que permite personalizar com
 {{ ticket.date }}           Fecha
 {{ ticket.time }}           Hora
 {{ ticket.cashier }}        Cajero
+{{ pos.name }}              Nombre del punto de venta (pos.config)
 {{ customer.name }}         Cliente
+{{ customer.giro }}         Giro / actividad económica del cliente
+{{ customer.address }}      Dirección del cliente en una línea
+{{ customer.phone }}        Teléfono del cliente
+{{ customer.email }}        Correo del cliente
+{{ doc.type }}              Tipo de DTE legible (ej: Factura, Crédito Fiscal)
+{{ doc.control_number }}    Número de control del DTE
+{{ doc.seal }}              Sello de recepción del Ministerio de Hacienda
 {{ totals.subtotal }}       Subtotal
 {{ totals.tax_amount }}     Impuesto
 {{ totals.total }}          Total
 {{ totals.change }}         Cambio
 {{ config.footer_message }} Pie de página
 ```
+
+`pos`, `doc` y los datos del cliente se leen del backend antes de imprimir
+(número de control, tipo y sello no viajan en el objeto Order del navegador).
+Si la orden aún no tiene DTE, todas estas variables quedan vacías y la
+plantilla se imprime igual.
+
+El objeto `dte` (`{{ dte.generation_code }}`, `{{ dte.qr_image }}`,
+`{{ dte.verify_url }}`, `{{ dte.status }}`) lo publica la integración externa de
+facturación electrónica; este módulo no lo modifica y usa su propio espacio,
+`doc`, para no chocar con ella.
 
 ## Variables disponibles en la plantilla del Corte Z
 

@@ -3,9 +3,10 @@
 import { patch } from "@web/core/utils/patch";
 import { OrderReceipt } from "@point_of_sale/app/screens/receipt_screen/receipt/order_receipt";
 import { ReceiptHeader } from "@point_of_sale/app/screens/receipt_screen/receipt/receipt_header/receipt_header";
-import { markup, onMounted, onPatched } from "@odoo/owl";
+import { markup, onMounted, onPatched, onWillStart } from "@odoo/owl";
 import { TemplateRenderer } from "@pos_custom_receipt/js/template_renderer";
 import { formatTicketNumber, extractInternalSeq, computeDisplayedSeq, needsSequenceReset } from "@pos_custom_receipt/js/ticket_sequence";
+import { asText, fetchReceiptExtra, partnerAddress } from "@pos_custom_receipt/js/receipt_extra";
 import { rpc } from "@web/core/network/rpc";
 
 const _renderer = new TemplateRenderer();
@@ -25,11 +26,25 @@ patch(OrderReceipt.prototype, {
 
     setup() {
         super.setup();
+        this.receiptExtra = null;
+        // El DTE y la ficha del cliente viven en el backend: se piden antes del
+        // primer render (Owl espera a onWillStart) para que
+        // _buildReceiptContext() siga siendo síncrono.
+        onWillStart(async () => {
+            this.receiptExtra = await this._loadReceiptExtra();
+        });
         onMounted(() => {
             this._applyDynamicClasses();
             this._triggerSequenceResetIfNeeded();
         });
         onPatched(() => this._applyDynamicClasses());
+    },
+
+    async _loadReceiptExtra() {
+        if (!this.useCustomTemplate) {
+            return null;
+        }
+        return fetchReceiptExtra(this.order?.id);
     },
 
     _triggerSequenceResetIfNeeded() {
@@ -141,7 +156,22 @@ patch(OrderReceipt.prototype, {
 
         const ticketNumber = this.customTicketNumber || order.name || '';
 
+        // Lo que vino del backend manda; si no llegó, se cae a lo que el POS
+        // ya tiene cargado del partner y a cadenas vacías.
+        const partner = order.partner_id || {};
+        const extra = this.receiptExtra || {};
+        const doc = extra.doc || {};
+        const extraCustomer = extra.customer || {};
+
         return {
+            pos: {
+                name: asText(extra.pos?.name) || asText(config.name),
+            },
+            doc: {
+                type: asText(doc.type),
+                seal: asText(doc.seal),
+                control_number: asText(doc.control_number),
+            },
             company: {
                 name: company.name || '',
                 street: company.street || '',
@@ -164,6 +194,10 @@ patch(OrderReceipt.prototype, {
                 name: order.partner_id?.name || '',
                 nit: order.partner_id?.nit || null,
                 dui: order.partner_id?.dui || null,
+                giro: asText(extraCustomer.giro) || asText(partner.giro),
+                address: asText(extraCustomer.address) || partnerAddress(partner),
+                phone: asText(extraCustomer.phone) || asText(partner.phone) || asText(partner.mobile),
+                email: asText(extraCustomer.email) || asText(partner.email),
             },
             lines: orderlines,
             totals: {
