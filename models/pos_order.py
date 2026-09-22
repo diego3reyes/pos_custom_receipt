@@ -47,6 +47,9 @@ PARTNER_GIRO_FIELDS = (
     'actividad_economica',
 )
 
+# Tipos de campo que se pueden imprimir tal cual como giro.
+GIRO_PRINTABLE_TYPES = ('char', 'text', 'selection', 'many2one')
+
 EMPTY_DOC = {'type': '', 'seal': '', 'control_number': ''}
 EMPTY_CUSTOMER = {'giro': '', 'address': '', 'phone': '', 'email': ''}
 
@@ -87,9 +90,11 @@ class PosOrder(models.Model):
     def _pcr_dte(self):
         """El DTE que corresponde a esta orden, o None.
 
-        Prefiere el que casa con el código de generación de la orden y descarta
-        los anulados mientras quede alguno vigente; a igualdad, el más reciente,
-        con el mismo criterio que el resumen del Corte Z.
+        Descarta los anulados mientras quede alguno vigente. Si la orden lleva
+        código de generación, solo vale el DTE con ese mismo código: sin
+        coincidencia no se imprime ninguno, nunca otro documento de la orden.
+        Sin código de generación se toma el más reciente, con el mismo criterio
+        cronológico que el resumen del Corte Z.
         """
         self.ensure_one()
         documents = self._pcr_dte_documents()
@@ -99,16 +104,19 @@ class PosOrder(models.Model):
         live = documents.filtered(lambda d: not _optional(d, 'invalidated_at'))
         candidates = live or documents
 
-        selected = candidates.browse()
         # En mayúsculas: el mismo UUID puede venir con distinto casing.
         generation_code = _text(_optional(self.sudo(), 'fl_l10n_sv_generation_code')).upper()
         if generation_code:
-            selected = candidates.filtered(
+            # Con código de generación solo sirve su DTE: tras un reintento o
+            # una regeneración, el anterior traeria un sello, un número de
+            # control y un tipo que ya no son los de esta orden.
+            matching = candidates.filtered(
                 lambda d: _text(_optional(d, 'generation_code')).upper() == generation_code
             ).sorted(key=_dte_sort_key)[-1:]
-        if not selected:
-            # Sin coincidencia por código de generación: el más reciente.
-            selected = candidates.sorted(key=_dte_sort_key)[-1:]
+            return matching[0] if matching else None
+
+        # Sin código de generación en la orden: el vigente más reciente.
+        selected = candidates.sorted(key=_dte_sort_key)[-1:]
         return selected[0] if selected else None
 
     def _pcr_dte_documents(self):
@@ -194,6 +202,17 @@ def _field_label(record, field_name):
     return _code_label(value) or _text(value)
 
 
+def _printable_label(record, field_name):
+    """Como _field_label, pero solo para tipos que se imprimen tal cual.
+
+    Un booleano llamado x_giro_ok saldría como "True" en el ticket.
+    """
+    field = record._fields.get(field_name)
+    if field is None or field.type not in GIRO_PRINTABLE_TYPES:
+        return ''
+    return _field_label(record, field_name)
+
+
 def _code_label(value):
     """'01' → 'Factura'. Cadena vacía si no es un código de DTE conocido."""
     return DTE_TYPE_LABELS.get(_text(value), '')
@@ -227,22 +246,24 @@ def _dte_seal(dte):
 
 
 def _partner_giro(partner):
-    """Giro / actividad económica, con el campo que use la localización."""
-    field_name = next(
-        (name for name in PARTNER_GIRO_FIELDS if name in partner._fields), '',
-    )
-    if not field_name:
-        # Solo campos que de verdad se pueden imprimir: un booleano llamado
-        # x_giro_ok saldría como "True" en el ticket.
-        field_name = next(
-            (
-                name for name, field in sorted(partner._fields.items())
-                if ('giro' in name or 'economic_activity' in name)
-                and field.type in ('char', 'text', 'selection', 'many2one')
-            ),
-            '',
-        )
-    return _field_label(partner, field_name) if field_name else ''
+    """Giro / actividad económica: el primer campo con valor imprimible.
+
+    No basta con que el campo exista: puede haber un `giro` vacío y ser otro
+    campo de la localización el que lleva la actividad económica, así que se
+    recorren los candidatos hasta encontrar uno con valor.
+    """
+    for field_name in PARTNER_GIRO_FIELDS:
+        label = _printable_label(partner, field_name)
+        if label:
+            return label
+    # Ninguno de los conocidos: se busca por nombre, ya sin lista.
+    for field_name, _field in sorted(partner._fields.items()):
+        if 'giro' not in field_name and 'economic_activity' not in field_name:
+            continue
+        label = _printable_label(partner, field_name)
+        if label:
+            return label
+    return ''
 
 
 def _partner_address(partner):
