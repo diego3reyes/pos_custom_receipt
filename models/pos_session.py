@@ -174,6 +174,7 @@ class PosSession(models.Model):
                 'documents': [
                     {
                         'number': dte.control_number,
+                        'generation_code': _dte_value(dte, 'generation_code') or '',
                         'order': _order_reference(order),
                         'amount': money(order.amount_total),
                     }
