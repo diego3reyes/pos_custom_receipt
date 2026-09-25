@@ -116,7 +116,11 @@ class PosSession(models.Model):
 
     def _corte_z_dte_summary(self, orders, money):
         summary = {
-            key: {'count': 0, 'initial': '', 'final': '', 'total': money(0), 'documents': []}
+            key: {
+                'count': 0, 'initial': '', 'final': '', 'total': money(0),
+                'initial_generation_code': '', 'final_generation_code': '',
+                'documents': [],
+            }
             for key, _prefix in DTE_SECTIONS
         }
 
@@ -170,6 +174,8 @@ class PosSession(models.Model):
                 'count': len(entries),
                 'initial': entries[0][1].control_number,
                 'final': entries[-1][1].control_number,
+                'initial_generation_code': _dte_value(entries[0][1], 'generation_code') or '',
+                'final_generation_code': _dte_value(entries[-1][1], 'generation_code') or '',
                 'total': money(sum(order.amount_total for _key, _dte, order in entries)),
                 'documents': [
                     {
